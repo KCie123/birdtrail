@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FiAlertCircle, FiArrowRight, FiExternalLink, FiMapPin, FiPhone } from 'react-icons/fi'
+import { FiAlertCircle, FiArrowRight, FiExternalLink, FiMapPin } from 'react-icons/fi'
 import {
   fetchRecentObservations,
   resolveLocation,
@@ -123,7 +123,6 @@ function approximateDriveTimeMinutes(distanceMiles: number | null | undefined) {
 function App() {
   const apiKey = import.meta.env.VITE_EBIRD_API_KEY ?? ''
   const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN ?? ''
-  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000'
   const hasApiKey = Boolean(apiKey)
 
   const [locationInput, setLocationInput] = useState('')
@@ -140,14 +139,11 @@ function App() {
   const [searchState, setSearchState] = useState<SearchState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [searchSummary, setSearchSummary] = useState<SearchSummary | null>(null)
-  const [notificationPhone, setNotificationPhone] = useState('')
-  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null)
   const [radiusMiles, setRadiusMiles] = useState(DEFAULT_RADIUS_MILES)
   const [travelEstimateMinutes, setTravelEstimateMinutes] = useState<number | null>(null)
   const [travelEstimateSource, setTravelEstimateSource] = useState<
     'mapbox' | 'osrm' | 'approx' | null
   >(null)
-  const [notificationLoading, setNotificationLoading] = useState(false)
 
   const trimmedLocation = locationInput.trim()
   const isLocationValid =
@@ -343,8 +339,6 @@ function App() {
 
     setSearchState('searching')
     setErrorMessage(null)
-    setNotificationFeedback(null)
-
     try {
       const resolvedLocation =
         locationSelection ?? (await resolveLocation(locationInput.trim()))
@@ -577,69 +571,6 @@ function App() {
     }
   }, [topObservation, locationSelection, mapboxToken])
 
-  const handleNotificationSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-
-    if (!notificationPhone.trim()) {
-      setNotificationFeedback('Add a phone number to subscribe to alerts.')
-      return
-    }
-
-    if (!speciesSelection) {
-      setNotificationFeedback('Search for a species first so we know which alerts to send.')
-      return
-    }
-
-    if (!locationSelection) {
-      setNotificationFeedback('Run a search and pick a location before subscribing to alerts.')
-      return
-    }
-
-    setNotificationLoading(true)
-    setNotificationFeedback(null)
-
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/subscriptions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phone: notificationPhone.trim(),
-          speciesCode: speciesSelection.speciesCode,
-          speciesCommonName: speciesSelection.comName,
-          locationLabel: locationSelection.label,
-          latitude: locationSelection.latitude,
-          longitude: locationSelection.longitude,
-          radiusMiles,
-          lookBackDays: DEFAULT_LOOKBACK_DAYS,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}))
-        throw new Error(
-          errorBody?.error ??
-            `Subscription failed with status ${response.status} ${response.statusText}`,
-        )
-      }
-
-      setNotificationFeedback(
-        'Great! You will receive SMS alerts when new sightings are reported. You can close this tab.',
-      )
-      setNotificationPhone('')
-    } catch (error) {
-      console.error(error)
-      setNotificationFeedback(
-        error instanceof Error
-          ? error.message
-          : 'We could not subscribe your phone just yet. Please try again.',
-      )
-    } finally {
-      setNotificationLoading(false)
-    }
-  }
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -853,8 +784,7 @@ function App() {
               <div className="rounded-2xl border border-slate-800/70 bg-slate-900/60 p-8 text-center text-slate-300">
                 <h2 className="text-xl font-semibold text-slate-100">No recent sightings nearby</h2>
                 <p className="mt-2">
-                  Try expanding the search radius or looking back further in time once backend filters
-                  are wired up.
+                  Try expanding the search radius or looking back further in time to broaden the results.
                 </p>
               </div>
             )}
@@ -900,40 +830,12 @@ function App() {
 
         <aside className="flex w-full flex-col gap-6 rounded-3xl border border-slate-800/70 bg-slate-900/60 p-6 backdrop-blur lg:w-[22rem] lg:flex-none">
           <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-6 text-slate-100">
-            <h2 className="text-lg font-semibold text-sky-100">Stay in the loop</h2>
+            <h2 className="text-lg font-semibold text-sky-100">Plan your outing</h2>
             <p className="mt-2 text-sm text-slate-200">
-              Hook this UI up to a serverless function or backend that watches eBird updates and sends
-              SMS alerts when new sightings pop up within your radius. Twilio, Vonage, or AWS SNS are
-              great providers to start with.
+              Use the map links, recent checklist IDs, and your own notes to keep track of birds you are
+              chasing. Want automated alerts? Connect BirdTrail to a backend of your choice or subscribe
+              to eBird&rsquo;s daily county emails.
             </p>
-
-            <form onSubmit={handleNotificationSubmit} className="mt-4 space-y-3">
-              <label className="flex flex-col gap-2">
-                <span className="text-xs uppercase tracking-wide text-slate-200">Phone number</span>
-                <div className="relative flex items-center">
-                  <FiPhone className="pointer-events-none absolute left-3 text-base text-slate-500" />
-                  <input
-                    value={notificationPhone}
-                    onChange={(event) => setNotificationPhone(event.target.value)}
-                    placeholder="(555) 123-4567"
-                    className="w-full rounded-xl border border-sky-500/30 bg-slate-950/70 px-4 py-3 pl-10 text-base text-slate-100 outline-none transition focus:border-sky-200 focus:ring-2 focus:ring-sky-300/60"
-                  />
-                </div>
-              </label>
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={notificationLoading}
-              >
-                {notificationLoading ? 'Saving your alert…' : 'Enable SMS alerts'}
-              </button>
-            </form>
-
-            {notificationFeedback && (
-              <p className="mt-3 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
-                {notificationFeedback}
-              </p>
-            )}
           </div>
 
           {topObservation && (
