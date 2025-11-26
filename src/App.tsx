@@ -571,6 +571,59 @@ function App() {
     }
   }, [topObservation, locationSelection, mapboxToken])
 
+  const renderClosestSightingPanel = (extraClasses = '') => {
+    if (!topObservation) {
+      return null
+    }
+
+    return (
+      <div
+        className={`rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-6 text-emerald-100 ${extraClasses}`}
+      >
+        <h2 className="text-lg font-semibold">Closest sighting right now</h2>
+        <p className="mt-2 text-sm text-emerald-50/80">
+          {topObservation.locName} • {formatDistance(topObservation.distance)}
+        </p>
+        {travelEstimateMinutes !== null && locationSelection && (
+          <p className="mt-1 text-xs uppercase tracking-wide text-emerald-200/70">
+            ≈ {travelEstimateMinutes} min drive from {locationSelection.label}
+            {travelEstimateSource === 'mapbox' && (
+              <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-100/70">
+                mapbox
+              </span>
+            )}
+            {travelEstimateSource === 'osrm' && (
+              <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-100/70">
+                osrm
+              </span>
+            )}
+            {travelEstimateSource === 'approx' && (
+              <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-200/60">
+                estimate
+              </span>
+            )}
+          </p>
+        )}
+        <p className="mt-2 text-sm">
+          Last seen {formatRelativeTime(topObservation.obsDt)} ({formatDate(topObservation.obsDt)}).
+        </p>
+        <p className="mt-4 text-xs uppercase tracking-wide text-emerald-200/70">Sub checklist ID</p>
+        <p className="font-mono text-sm">{topObservation.subId}</p>
+        {directionsUrl && (
+          <a
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+          >
+            <FiExternalLink className="text-base" />
+            Get directions
+          </a>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -759,6 +812,8 @@ function App() {
                 {errorMessage}
               </p>
             )}
+
+            {renderClosestSightingPanel('mt-6 lg:hidden')}
           </form>
 
           <section className="space-y-4">
@@ -838,52 +893,7 @@ function App() {
             </p>
           </div>
 
-          {topObservation && (
-            <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-6 text-emerald-100">
-              <h2 className="text-lg font-semibold">Closest sighting right now</h2>
-              <p className="mt-2 text-sm text-emerald-50/80">
-                {topObservation.locName} • {formatDistance(topObservation.distance)}
-              </p>
-              {travelEstimateMinutes !== null && locationSelection && (
-                <p className="mt-1 text-xs uppercase tracking-wide text-emerald-200/70">
-                  ≈ {travelEstimateMinutes} min drive from {locationSelection.label}
-                  {travelEstimateSource === 'mapbox' && (
-                    <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-100/70">
-                      mapbox
-                    </span>
-                  )}
-                  {travelEstimateSource === 'osrm' && (
-                    <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-100/70">
-                      osrm
-                    </span>
-                  )}
-                  {travelEstimateSource === 'approx' && (
-                    <span className="ml-2 text-[0.65rem] uppercase tracking-wider text-emerald-200/60">
-                      estimate
-                    </span>
-                  )}
-                </p>
-              )}
-              <p className="mt-2 text-sm">
-                Last seen {formatRelativeTime(topObservation.obsDt)} ({formatDate(topObservation.obsDt)}).
-              </p>
-              <p className="mt-4 text-xs uppercase tracking-wide text-emerald-200/70">
-                Sub checklist ID
-              </p>
-              <p className="font-mono text-sm">{topObservation.subId}</p>
-              {directionsUrl && (
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
-                >
-                  <FiExternalLink className="text-base" />
-                  Get directions
-                </a>
-              )}
-            </div>
-          )}
+          {renderClosestSightingPanel('hidden lg:block')}
         </aside>
       </main>
     </div>
