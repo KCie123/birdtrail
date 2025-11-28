@@ -23,6 +23,10 @@ interface SearchSummary {
 const DEFAULT_RADIUS_MILES = 50
 const DEFAULT_LOOKBACK_DAYS = 3
 const RADIUS_OPTIONS = [10, 25, 50]
+const MIN_BIRD_COUNT_OPTIONS = [
+  { label: 'Any reported count', value: 1 },
+  { label: 'Multiple birds reported', value: 2 },
+]
 
 const formatLocationLabel = (location: LocationLookupResult) => {
   const cityState = [location.city, location.state].filter(Boolean).join(', ')
@@ -140,6 +144,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [searchSummary, setSearchSummary] = useState<SearchSummary | null>(null)
   const [radiusMiles, setRadiusMiles] = useState(DEFAULT_RADIUS_MILES)
+  const [minBirdCount, setMinBirdCount] = useState<number>(MIN_BIRD_COUNT_OPTIONS[0].value)
   const [travelEstimateMinutes, setTravelEstimateMinutes] = useState<number | null>(null)
   const [travelEstimateSource, setTravelEstimateSource] = useState<
     'mapbox' | 'osrm' | 'approx' | null
@@ -276,6 +281,11 @@ function App() {
       return
     }
 
+    if (speciesSelection && speciesSelection.comName === speciesQuery.trim()) {
+      setSpeciesSuggestions([])
+      return
+    }
+
     let isCurrent = true
     setSpeciesLoading(true)
     setSpeciesError(null)
@@ -307,7 +317,7 @@ function App() {
       isCurrent = false
       window.clearTimeout(debounce)
     }
-  }, [speciesQuery, apiKey, hasApiKey])
+  }, [speciesQuery, speciesSelection, apiKey, hasApiKey])
 
   const handleSuggestionSelection = (match: SpeciesMatch) => {
     setSpeciesSelection(match)
@@ -377,14 +387,19 @@ function App() {
         apiKey,
       )
 
-      setObservations(sightings)
+      const filteredSightings = sightings.filter((observation) => {
+        const reportedCount = observation.howMany ?? 1
+        return reportedCount >= minBirdCount
+      })
+
+      setObservations(filteredSightings)
 
       setSearchSummary({
         locationLabel: normalizedLocation.label,
         speciesCommonName: match.comName,
         speciesScientificName: match.sciName,
         radiusMiles,
-        observationsFound: sightings.length,
+        observationsFound: filteredSightings.length,
       })
 
       setSearchState('ready')
@@ -666,11 +681,9 @@ function App() {
             onSubmit={handleFormSubmit}
             className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-[0_40px_60px_-50px_rgba(14,165,233,0.45)] backdrop-blur"
           >
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[2.2fr_3.2fr_1fr]">
-              <label className="group flex flex-col gap-2 md:col-span-2 lg:col-span-1">
-                <span className="text-sm font-medium text-slate-300">
-                  Location (ZIP code or city)
-                </span>
+            <div className="grid gap-6 items-start md:grid-cols-2 lg:grid-cols-[2.2fr_3.2fr_1fr_1fr]">
+              <label className="group flex flex-col gap-2 md:col-span-1 lg:col-span-1">
+                <span className="text-sm font-medium text-slate-300">Location</span>
                 <div className="relative">
                   <input
                     value={locationInput}
@@ -717,17 +730,23 @@ function App() {
                       </div>
                     )}
                 </div>
+                <span className="text-xs text-slate-500">
+                  Enter a ZIP code or city to anchor the search.
+                </span>
               </label>
 
-              <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-1">
+              <div className="flex flex-col gap-2 md:col-span-1 lg:col-span-1">
                 <label className="text-sm font-medium text-slate-300">Species</label>
                 <div className="relative">
                   <input
                     value={speciesQuery}
-                    onChange={(event) => {
-                      setSpeciesQuery(event.target.value)
+                  onChange={(event) => {
+                    const nextValue = event.target.value
+                    setSpeciesQuery(nextValue)
+                    if (speciesSelection?.comName !== nextValue.trim()) {
                       setSpeciesSelection(null)
-                    }}
+                    }
+                  }}
                     placeholder="e.g. Snowy Owl"
                     className="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-base text-slate-100 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/50"
                     required
@@ -780,7 +799,25 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-1">
+              <div className="flex flex-col gap-2 md:col-span-1 lg:col-span-1">
+                <label className="text-sm font-medium text-slate-300">Minimum bird count</label>
+                <select
+                  value={minBirdCount}
+                  onChange={(event) => setMinBirdCount(Number(event.target.value))}
+                  className="rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-base text-slate-100 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/50"
+                >
+                  {MIN_BIRD_COUNT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-500">
+                  Filter sightings by the reported group size when available.
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2 md:col-span-1 lg:col-span-1">
                 <label className="text-sm font-medium text-slate-300">Search radius</label>
                 <select
                   value={radiusMiles}
@@ -828,6 +865,11 @@ function App() {
                   near{' '}
                   <span className="font-semibold text-sky-300">{searchSummary.locationLabel}</span> in
                   the last {DEFAULT_LOOKBACK_DAYS} days within {searchSummary.radiusMiles} miles.
+                </p>
+                <p>
+                  {minBirdCount > 1
+                    ? 'Only checklists reporting multiple birds are shown.'
+                    : 'Showing all reported counts.'}
                 </p>
                 <p className="text-xs uppercase tracking-wide text-slate-500">
                   {searchSummary.observationsFound} sightings found
