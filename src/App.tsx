@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FiAlertCircle, FiArrowRight, FiExternalLink, FiMapPin } from 'react-icons/fi'
 import {
   fetchRecentObservations,
@@ -23,6 +23,7 @@ interface SearchSummary {
 const DEFAULT_RADIUS_MILES = 50
 const DEFAULT_LOOKBACK_DAYS = 3
 const RADIUS_OPTIONS = [10, 25, 50]
+const SEARCH_COOLDOWN_MS = 4000
 const MIN_BIRD_COUNT_OPTIONS = [
   { label: 'Any reported count', value: 1 },
   { label: 'Multiple birds reported', value: 2 },
@@ -149,6 +150,56 @@ function App() {
   const [travelEstimateSource, setTravelEstimateSource] = useState<
     'mapbox' | 'osrm' | 'approx' | null
   >(null)
+  const [isCooldown, setIsCooldown] = useState(false)
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
+  const cooldownTimeoutRef = useRef<number | null>(null)
+  const cooldownIntervalRef = useRef<number | null>(null)
+
+  const startCooldown = () => {
+    setIsCooldown(true)
+    setCooldownSeconds(Math.ceil(SEARCH_COOLDOWN_MS / 1000))
+
+    if (cooldownTimeoutRef.current) {
+      window.clearTimeout(cooldownTimeoutRef.current)
+    }
+    if (cooldownIntervalRef.current) {
+      window.clearInterval(cooldownIntervalRef.current)
+    }
+
+    cooldownTimeoutRef.current = window.setTimeout(() => {
+      setIsCooldown(false)
+      setCooldownSeconds(0)
+      cooldownTimeoutRef.current = null
+      if (cooldownIntervalRef.current) {
+        window.clearInterval(cooldownIntervalRef.current)
+        cooldownIntervalRef.current = null
+      }
+    }, SEARCH_COOLDOWN_MS)
+
+    cooldownIntervalRef.current = window.setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          if (cooldownIntervalRef.current) {
+            window.clearInterval(cooldownIntervalRef.current)
+            cooldownIntervalRef.current = null
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (cooldownTimeoutRef.current) {
+        window.clearTimeout(cooldownTimeoutRef.current)
+      }
+      if (cooldownIntervalRef.current) {
+        window.clearInterval(cooldownIntervalRef.current)
+      }
+    }
+  }, [])
 
   const trimmedLocation = locationInput.trim()
   const isLocationValid =
@@ -347,6 +398,12 @@ function App() {
       return
     }
 
+    if (isCooldown) {
+      setErrorMessage('Please wait a moment between searches to avoid spamming the eBird API.')
+      return
+    }
+
+    startCooldown()
     setSearchState('searching')
     setErrorMessage(null)
     try {
@@ -738,8 +795,8 @@ function App() {
               <div className="flex flex-col gap-2 md:col-span-1 lg:col-span-1">
                 <label className="text-sm font-medium text-slate-300">Species</label>
                 <div className="relative">
-                  <input
-                    value={speciesQuery}
+                <input
+                  value={speciesQuery}
                   onChange={(event) => {
                     const nextValue = event.target.value
                     setSpeciesQuery(nextValue)
@@ -839,9 +896,13 @@ function App() {
             <button
               type="submit"
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-base font-semibold text-slate-900 transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!isFormValid || searchState === 'searching' || !hasApiKey}
+              disabled={!isFormValid || searchState === 'searching' || !hasApiKey || isCooldown}
             >
-              {searchState === 'searching' ? 'Searching sightings…' : 'Find recent sightings'}
+              {searchState === 'searching'
+                ? 'Searching sightings…'
+                : isCooldown
+                  ? `Please wait${cooldownSeconds ? ` (${cooldownSeconds}s)` : ''}`
+                  : 'Find recent sightings'}
             </button>
 
             {errorMessage && (
