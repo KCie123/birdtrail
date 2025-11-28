@@ -86,6 +86,17 @@ function formatDate(isoDate: string) {
   }).format(date)
 }
 
+function formatFetchTimestamp(isoDate: string) {
+  const date = new Date(isoDate)
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date)
+}
+
 function toRadians(degrees: number) {
   return (degrees * Math.PI) / 180
 }
@@ -154,6 +165,7 @@ function App() {
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const cooldownTimeoutRef = useRef<number | null>(null)
   const cooldownIntervalRef = useRef<number | null>(null)
+  const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null)
 
   const startCooldown = () => {
     setIsCooldown(true)
@@ -450,6 +462,7 @@ function App() {
       })
 
       setObservations(filteredSightings)
+      setLastFetchedAt(new Date().toISOString())
 
       setSearchSummary({
         locationLabel: normalizedLocation.label,
@@ -932,6 +945,11 @@ function App() {
                     ? 'Only checklists reporting multiple birds are shown.'
                     : 'Showing all reported counts.'}
                 </p>
+                {lastFetchedAt && (
+                  <p className="text-xs text-slate-500">
+                    Data fetched from eBird at {formatFetchTimestamp(lastFetchedAt)}.
+                  </p>
+                )}
                 <p className="text-xs uppercase tracking-wide text-slate-500">
                   {searchSummary.observationsFound} sightings found
                 </p>
