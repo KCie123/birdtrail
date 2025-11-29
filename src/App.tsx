@@ -728,7 +728,7 @@ function App() {
               </h1>
               <p className="max-w-2xl text-lg text-slate-300">
                 Enter a US ZIP code and the species you are curious about. We will look up the
-                latest eBird observations nearby and get you ready for real-time SMS alerts.
+                latest eBird observations nearby.
               </p>
             </div>
           </header>
